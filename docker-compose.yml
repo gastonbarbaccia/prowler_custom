@@ -4,13 +4,13 @@
 # For development with local builds and hot-reload, use docker-compose-dev.yml instead:
 #   docker compose -f docker-compose-dev.yml up
 #
+
 services:
   api:
-    hostname: "prowler-api"
+    hostname: prowler-api
     image: prowlercloud/prowler-api:${PROWLER_API_VERSION:-stable}
     env_file:
-      - path: .env
-        required: false
+      - .env
     ports:
       - "${DJANGO_PORT:-8080}:${DJANGO_PORT:-8080}"
     volumes:
@@ -24,124 +24,117 @@ services:
       neo4j:
         condition: service_healthy
     entrypoint:
-      - "/home/prowler/docker-entrypoint.sh"
-      - "prod"
+      - /home/prowler/docker-entrypoint.sh
+      - prod
 
   ui:
     image: prowlercloud/prowler-ui:${PROWLER_UI_VERSION:-stable}
     env_file:
-      - path: .env
-        required: false
+      - .env
     ports:
-      - ${UI_PORT:-3000}:${UI_PORT:-3000}
+      - "${UI_PORT:-3000}:${UI_PORT:-3000}"
     depends_on:
       mcp-server:
         condition: service_healthy
 
   postgres:
     image: postgres:16.3-alpine3.20
-    hostname: "postgres-db"
+    hostname: postgres-db
     volumes:
       - ./_data/postgres:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=${POSTGRES_ADMIN_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_ADMIN_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     env_file:
-      - path: .env
-        required: false
+      - .env
     ports:
       - "${POSTGRES_PORT:-5432}:${POSTGRES_PORT:-5432}"
     healthcheck:
-      test: ["CMD-SHELL", "sh -c 'pg_isready -U ${POSTGRES_ADMIN_USER} -d ${POSTGRES_DB}'"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   valkey:
     image: valkey/valkey:7-alpine3.19
-    hostname: "valkey"
+    hostname: valkey
     volumes:
       - ./_data/valkey:/data
     env_file:
-      - path: .env
-        required: false
+      - .env
     ports:
       - "${VALKEY_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD-SHELL", "sh -c 'valkey-cli ping'"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
 
   neo4j:
     image: graphstack/dozerdb:5.26.3.0
-    hostname: "neo4j"
+    hostname: neo4j
     volumes:
       - ./_data/neo4j:/data
     environment:
-      # We can't add our .env file because some of our current variables are not compatible with Neo4j env vars
-      # Auth
-      - NEO4J_AUTH=${NEO4J_USER}/${NEO4J_PASSWORD}
-      # Memory limits
-      - NEO4J_dbms_max__databases=${NEO4J_DBMS_MAX__DATABASES:-1000}
-      - NEO4J_server_memory_pagecache_size=${NEO4J_SERVER_MEMORY_PAGECACHE_SIZE:-1G}
-      - NEO4J_server_memory_heap_initial__size=${NEO4J_SERVER_MEMORY_HEAP_INITIAL__SIZE:-1G}
-      - NEO4J_server_memory_heap_max__size=${NEO4J_SERVER_MEMORY_HEAP_MAX__SIZE:-1G}
-      # APOC
-      - apoc.export.file.enabled=${NEO4J_POC_EXPORT_FILE_ENABLED:-true}
-      - apoc.import.file.enabled=${NEO4J_APOC_IMPORT_FILE_ENABLED:-true}
-      - apoc.import.file.use_neo4j_config=${NEO4J_APOC_IMPORT_FILE_USE_NEO4J_CONFIG:-true}
-      - "NEO4J_PLUGINS=${NEO4J_PLUGINS:-[\"apoc\"]}"
-      - "NEO4J_dbms_security_procedures_allowlist=${NEO4J_DBMS_SECURITY_PROCEDURES_ALLOWLIST:-apoc.*}"
-      - "NEO4J_dbms_security_procedures_unrestricted=${NEO4J_DBMS_SECURITY_PROCEDURES_UNRESTRICTED:-apoc.*}"
-      # Networking
-      - "dbms.connector.bolt.listen_address=${NEO4J_DBMS_CONNECTOR_BOLT_LISTEN_ADDRESS:-0.0.0.0:7687}"
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
+
+      NEO4J_dbms_max__databases: ${NEO4J_DBMS_MAX__DATABASES:-1000}
+      NEO4J_server_memory_pagecache_size: ${NEO4J_SERVER_MEMORY_PAGECACHE_SIZE:-1G}
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_SERVER_MEMORY_HEAP_INITIAL__SIZE:-1G}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_SERVER_MEMORY_HEAP_MAX__SIZE:-1G}
+
+      apoc.export.file.enabled: ${NEO4J_APOC_EXPORT_FILE_ENABLED:-true}
+      apoc.import.file.enabled: ${NEO4J_APOC_IMPORT_FILE_ENABLED:-true}
+      apoc.import.file.use_neo4j_config: ${NEO4J_APOC_IMPORT_FILE_USE_NEO4J_CONFIG:-true}
+
+      NEO4J_PLUGINS: ${NEO4J_PLUGINS:-["apoc"]}
+      NEO4J_dbms_security_procedures_allowlist: ${NEO4J_DBMS_SECURITY_PROCEDURES_ALLOWLIST:-apoc.*}
+      NEO4J_dbms_security_procedures_unrestricted: ${NEO4J_DBMS_SECURITY_PROCEDURES_UNRESTRICTED:-apoc.*}
+
+      dbms.connector.bolt.listen_address: ${NEO4J_DBMS_CONNECTOR_BOLT_LISTEN_ADDRESS:-0.0.0.0:7687}
     ports:
-      - ${NEO4J_PORT:-7687}:7687
+      - "${NEO4J_PORT:-7687}:7687"
     healthcheck:
-        test: ["CMD", "wget", "--no-verbose", "http://localhost:7474"]
-        interval: 10s
-        timeout: 10s
-        retries: 10
+      test: ["CMD", "wget", "--no-verbose", "http://localhost:7474"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
 
   worker:
     image: prowlercloud/prowler-api:${PROWLER_API_VERSION:-stable}
     env_file:
-      - path: .env
-        required: false
+      - .env
     volumes:
-      - "output:/tmp/prowler_api_output"
+      - output:/tmp/prowler_api_output
     depends_on:
       valkey:
         condition: service_healthy
       postgres:
         condition: service_healthy
     entrypoint:
-      - "/home/prowler/docker-entrypoint.sh"
-      - "worker"
+      - /home/prowler/docker-entrypoint.sh
+      - worker
 
   worker-beat:
     image: prowlercloud/prowler-api:${PROWLER_API_VERSION:-stable}
     env_file:
-      - path: ./.env
-        required: false
+      - .env
     depends_on:
       valkey:
         condition: service_healthy
       postgres:
         condition: service_healthy
     entrypoint:
-      - "../docker-entrypoint.sh"
-      - "beat"
+      - /home/prowler/docker-entrypoint.sh
+      - beat
 
   mcp-server:
     image: prowlercloud/prowler-mcp:${PROWLER_MCP_VERSION:-stable}
-    environment:
-      - PROWLER_MCP_TRANSPORT_MODE=http
     env_file:
-      - path: .env
-        required: false
+      - .env
+    environment:
+      PROWLER_MCP_TRANSPORT_MODE: http
     ports:
       - "8000:8000"
     command: ["uvicorn", "--host", "0.0.0.0", "--port", "8000"]
@@ -154,3 +147,4 @@ services:
 volumes:
   output:
     driver: local
+
