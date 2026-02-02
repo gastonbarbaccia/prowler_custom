@@ -31,11 +31,8 @@ services:
     image: prowlercloud/prowler-ui:${PROWLER_UI_VERSION:-stable}
     env_file:
       - .env
-    environment:
-      HOST: 0.0.0.0
-      PORT: 3000
     ports:
-      - "3000:3000"
+      - "${UI_PORT:-3000}:${UI_PORT:-3000}"
     depends_on:
       mcp-server:
         condition: service_healthy
@@ -150,4 +147,5 @@ services:
 volumes:
   output:
     driver: local
+
 
